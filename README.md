@@ -58,7 +58,7 @@ Prerequisites: Python 3.12+, Node 20+, Git Bash.
 bash scripts/setup_toolchain.sh
 ```
 Downloads OSS CAD Suite (Icarus 14, Verilator 5, Yosys, GTKWave) and, on Windows, w64devkit (g++ 16 +
-make, needed for Verilator simulation) into `../eda-toolchain/`, where the backend auto-detects them.
+make, needed for Verilator simulation) into `eda-toolchain/` (gitignored, inside the repo), where the backend auto-detects them.
 
 ```bash
 python -m venv backend/.venv && backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt

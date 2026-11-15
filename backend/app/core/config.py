@@ -71,13 +71,17 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     s = Settings()
     if s.sgpt_toolchain_dir is None:
-        guess = REPO_ROOT.parent / "eda-toolchain" / "oss-cad-suite"
-        if guess.exists():
-            s.sgpt_toolchain_dir = guess
+        for base in (REPO_ROOT / "eda-toolchain", REPO_ROOT.parent / "eda-toolchain"):
+            guess = base / "oss-cad-suite"
+            if guess.exists():
+                s.sgpt_toolchain_dir = guess
+                break
     if s.sgpt_cxx_dir is None:
-        guess = REPO_ROOT.parent / "eda-toolchain" / "w64devkit" / "bin"
-        if guess.exists():
-            s.sgpt_cxx_dir = guess
+        for base in (REPO_ROOT / "eda-toolchain", REPO_ROOT.parent / "eda-toolchain"):
+            guess = base / "w64devkit" / "bin"
+            if guess.exists():
+                s.sgpt_cxx_dir = guess
+                break
     s.sgpt_data_dir.mkdir(parents=True, exist_ok=True)
     s.runs_dir.mkdir(parents=True, exist_ok=True)
     return s

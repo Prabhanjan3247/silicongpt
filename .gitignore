@@ -17,3 +17,7 @@ obj_dir/
 frontend/.env.local
 .claude/
 .pytest_cache/
+
+# Local toolchain and scratch work (not versioned)
+eda-toolchain/
+scratch/

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Downloads the HDL toolchain used by SiliconGPT into ../eda-toolchain (next to the repo).
+# Downloads the HDL toolchain used by SiliconGPT into ./eda-toolchain (repo root, gitignored).
 #   * YosysHQ OSS CAD Suite (Icarus Verilog, Verilator, Yosys, GTKWave)
 #   * Windows only: w64devkit (g++ 16 + make) so Verilator can build simulation binaries
 # Usage (Git Bash on Windows, or bash on Linux):  bash scripts/setup_toolchain.sh
@@ -7,7 +7,7 @@ set -euo pipefail
 DATE="${OSS_CAD_SUITE_DATE:-2026-11-15}"
 TAG="${DATE//-/}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEST="$(cd "$ROOT/.." && pwd)/eda-toolchain"
+DEST="$ROOT/eda-toolchain"
 mkdir -p "$DEST"
 cd "$DEST"
 

@@ -5,25 +5,25 @@ the testbench protocol, example-project format and environment quirks. Implement
 these names/shapes. If you need a change to a file you do not own, do NOT edit it — list the
 request in your final report under `requests_for_other_owners`.
 
-Repo root: `C:/CSE_Projects/ABCD` (not a git repo). Product: AI-powered RTL design,
+Repo root: `C:/CSE_Projects/SiliconGPT` (not a git repo). Product: AI-powered RTL design,
 verification and debugging platform. **Hard rule: never fake tool output, coverage numbers,
 simulation results or waveforms. Never add buttons that do nothing. Never expose secrets.**
 
 ---------------------------------------------------------------------------------------------
 ## 0. Environment (Windows 11, Git Bash shell)
 
-* Python venv: `C:/CSE_Projects/ABCD/backend/.venv/Scripts/python.exe` (FastAPI 0.163, SQLAlchemy 2.0,
+* Python venv: `C:/CSE_Projects/SiliconGPT/backend/.venv/Scripts/python.exe` (FastAPI 0.163, SQLAlchemy 2.0,
   pydantic 2, anthropic 2.8, psutil, pytest). Run tests from repo root:
   `backend/.venv/Scripts/python.exe -m pytest tests -q` (tests/conftest.py puts `backend/` on sys.path
   and points `SGPT_DATA_DIR` at a temp dir).
-* HDL toolchain (OSS CAD Suite 2026-11-15): `C:/CSE_Projects/eda-toolchain/oss-cad-suite`
+* HDL toolchain (OSS CAD Suite 2026-11-15): `C:/CSE_Projects/SiliconGPT/eda-toolchain/oss-cad-suite`
   - Icarus Verilog 14.0 (`iverilog`, `vvp`), Yosys 0.71, Verilator 5.055 (`verilator_bin.exe`), GTKWave.
   - For manual shell use:
     ```bash
-    export PATH="/c/CSE_Projects/eda-toolchain/oss-cad-suite/bin:/c/CSE_Projects/eda-toolchain/oss-cad-suite/lib:/usr/bin:/c/CSE_Projects/eda-toolchain/w64devkit/bin:/c/Windows/System32"
-    export VERILATOR_ROOT=C:/CSE_Projects/eda-toolchain/oss-cad-suite/share/verilator   # forward slashes!
+    export PATH="/c/CSE_Projects/SiliconGPT/eda-toolchain/oss-cad-suite/bin:/c/CSE_Projects/SiliconGPT/eda-toolchain/oss-cad-suite/lib:/usr/bin:/c/CSE_Projects/SiliconGPT/eda-toolchain/w64devkit/bin:/c/Windows/System32"
+    export VERILATOR_ROOT=C:/CSE_Projects/SiliconGPT/eda-toolchain/oss-cad-suite/share/verilator   # forward slashes!
     ```
-  - Verilator simulation needs the w64devkit g++ 16 + make (`C:/CSE_Projects/eda-toolchain/w64devkit/bin`).
+  - Verilator simulation needs the w64devkit g++ 16 + make (`C:/CSE_Projects/SiliconGPT/eda-toolchain/w64devkit/bin`).
     It must come AFTER `/usr/bin` on PATH (its busybox shims are not executable here) and the old
     `C:/MinGW/bin` g++ 6.3 must NOT be on PATH. Build: `verilator_bin --binary --timing -j 8 ...`
     (~15-20 s per build because the Verilator runtime is compiled each time).
