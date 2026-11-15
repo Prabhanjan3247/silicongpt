@@ -1,0 +1,57 @@
+{
+  "key": "alu8",
+  "name": "8-bit ALU",
+  "description": "Combinational 8-bit ALU with ADD/SUB (carry + signed overflow), AND/OR/XOR/NOT, reserved-opcode detection and zero/negative flags. Flagship end-to-end demo: self-checking testbench with a reference model, functional coverage and five injectable bugs.",
+  "category": "combinational",
+  "difficulty": "beginner",
+  "spec": "Design a purely combinational 8-bit ALU named alu8 (no clock, no reset, no latches). Inputs: a[7:0], b[7:0], op[2:0]. Outputs: y[7:0], carry, zero, negative, overflow, invalid. Opcodes: 000 ADD: {carry, y} = a + b (carry is the carry out of the 9-bit sum), overflow = signed two's-complement overflow of a + b. 001 SUB: y = a - b computed as a + ~b + 1; carry is the carry out of that sum, so carry = 1 means no borrow (a >= b as unsigned numbers) and carry = 0 means a borrow occurred; overflow = signed two's-complement overflow of a - b. 010 AND: y = a & b. 011 OR: y = a | b. 100 XOR: y = a ^ b. 101 NOT: y = ~a (b is ignored). For AND/OR/XOR/NOT carry = 0 and overflow = 0. 110 and 111 are reserved: y = 0, invalid = 1, carry = 0, overflow = 0. invalid = 0 for every valid opcode. zero = 1 exactly when y == 0 (so zero = 1 for the reserved opcodes), negative = y[7].",
+  "top_module": "alu8",
+  "tb_top": "tb_alu8",
+  "simulator": "icarus",
+  "files": [
+    {"path": "alu8.v", "kind": "rtl"},
+    {"path": "tb_alu8.v", "kind": "tb"}
+  ],
+  "bugs": [
+    {
+      "id": "sub_missing_plus_one",
+      "title": "SUB drops the +1 carry-in",
+      "description": "The subtract path adds a and ~b but leaves out the +1 that completes the two's-complement negation of b, so every SUB returns a - b - 1 (0x10 - 0x01 gives 0x0E instead of 0x0F) and carry, zero and overflow are taken from that wrong sum. ADD and the logic ops are unaffected, so only SUB vectors fail.",
+      "file": "alu8.v",
+      "find": "{carry, y} = {1'b0, a} + {1'b0, ~b} + 9'd1;",
+      "replace": "{carry, y} = {1'b0, a} + {1'b0, ~b};"
+    },
+    {
+      "id": "xor_as_or",
+      "title": "XOR arm uses the OR operator",
+      "description": "Copy-paste slip in the opcode case: the XOR arm was duplicated from the OR arm and still uses |. The result is only wrong when a bit is set in both operands (0xFF XOR 0x0F should be 0xF0 but comes back as 0xFF); operands with disjoint bits such as 0xA5 and 0x5A still pass, which is how this kind of bug survives a few hand-written tests.",
+      "file": "alu8.v",
+      "find": "OP_XOR: y = a ^ b;",
+      "replace": "OP_XOR: y = a | b;"
+    },
+    {
+      "id": "sub_overflow_wrong",
+      "title": "SUB overflow uses the ADD rule",
+      "description": "The SUB arm reuses the ADD overflow equation (operands with the same sign). For a - b, signed overflow is only possible when a and b have different signs, so the flag is missed on 0x80 - 0x01 (-128 - 1) and raised falsely on 0x00 - 0x01 (0 - 1 = -1). y, carry, zero and negative stay correct; only the overflow field mismatches.",
+      "file": "alu8.v",
+      "find": "overflow = (a[7] != b[7]) && (y[7] != a[7]);",
+      "replace": "overflow = (a[7] == b[7]) && (y[7] != a[7]);"
+    },
+    {
+      "id": "zero_flag_inverted",
+      "title": "Zero flag polarity inverted",
+      "description": "zero is driven by the reduction OR of y instead of the reduction NOR (the ~ was dropped), so it reads 1 for every non-zero result and 0 exactly when the result is zero. The comment next to the assignment still says NOR. Affects every opcode, including the reserved ones.",
+      "file": "alu8.v",
+      "find": "assign zero = ~|y;",
+      "replace": "assign zero = |y;"
+    },
+    {
+      "id": "invalid_opcode_passthrough",
+      "title": "Reserved opcodes pass operand a through",
+      "description": "The default arm of the opcode case was written as a pass-through (y = a) and never raises invalid. Opcodes 110 and 111 then return operand a with invalid = 0 (zero and negative follow a) instead of y = 0 with invalid = 1. All six valid operations still pass, so only the invalid-opcode checks and the random vectors that land on 110/111 fail.",
+      "file": "alu8.v",
+      "find": "default: invalid = 1'b1;",
+      "replace": "default: y = a;"
+    }
+  ]
+}

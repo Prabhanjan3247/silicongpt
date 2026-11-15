@@ -1,0 +1,43 @@
+# SiliconGPT - local deployment.
+#   docker compose build && docker compose up
+#   UI: http://localhost:8080   API: http://localhost:8000/api/health
+# The backend container is hardened (non-root, read-only root fs, no capabilities, pid/memory
+# limits) and additionally applies the per-run limits of the local restricted executor.
+# It needs outbound network for the Claude API only; HDL tools never get credentials (the
+# executor passes a minimal environment). For per-run --network none isolation run the backend
+# on a Docker host with SGPT_SANDBOX_MODE=docker and the "sim" image built:
+#   docker build -f docker/Dockerfile --target sim -t silicongpt-sim:latest .
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: backend
+    env_file:
+      - path: backend/.env
+        required: false
+    ports:
+      - "8000:8000"
+    volumes:
+      - sgpt-data:/app/backend/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 6g
+    cpus: 4
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  sgpt-data:

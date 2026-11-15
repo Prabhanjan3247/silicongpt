@@ -1,0 +1,41 @@
+{
+  "key": "traffic_light",
+  "name": "Traffic light controller with pedestrian request",
+  "description": "Two-road intersection FSM (NS green, NS yellow, all red, EW green, EW yellow, all red) with fixed phase durations, a pedestrian request that ends a green early after a minimum green time and a walk signal during the following all-red phase. Self-checking testbench with lamp-only safety monitors, exact phase-duration checks per transition, pedestrian scenarios, asynchronous reset and a long seeded random pedestrian run with state/transition coverage.",
+  "category": "sequential",
+  "difficulty": "intermediate",
+  "spec": "Design a traffic light controller named traffic_light for a two-road intersection (north-south NS and east-west EW) with parameters GREEN_T=8, YELLOW_T=3, ALLRED_T=2 (phase lengths in clock cycles) and MIN_GREEN=3 (minimum green before a pedestrian request may end it, 1 <= MIN_GREEN <= GREEN_T). Ports: input clk; input rst_n (asynchronous, active-low reset); input ped_req; output [1:0] ns_light; output [1:0] ew_light; output walk; output [2:0] state. Light encoding: 2'b00 red, 2'b01 yellow, 2'b10 green. The state output exposes the phase: 0 NS_GREEN (ns green, ew red), 1 NS_YELLOW (ns yellow, ew red), 2 ALLRED_NE (both red), 3 EW_GREEN (ew green, ns red), 4 EW_YELLOW (ew yellow, ns red), 5 ALLRED_EN (both red). The phases repeat in the order 0,1,2,3,4,5,0,... Yellow phases last YELLOW_T cycles and all-red phases ALLRED_T cycles. Reset (immediate) enters ALLRED_EN with its cycle counter at 0 and walk=0, so after reset the intersection is all red for ALLRED_T cycles before NS turns green. Pedestrian rule (ped_req is sampled on the rising clock edge): a request becomes pending on the first edge that samples ped_req=1, except that requests sampled while walk=1 are ignored. A green phase lasts GREEN_T cycles, but it ends early on the first edge where a request is pending (latched or ped_req=1 on that edge) and the green has already lasted at least MIN_GREEN cycles. On the edge that ends a yellow phase, if a request is pending, walk becomes 1 for exactly the following all-red phase and the request is cleared. Lights must be glitch-free decodes of a single registered state so that both roads can never be non-red at the same time. The design must be synthesizable without latches.",
+  "top_module": "traffic_light",
+  "tb_top": "tb_traffic_light",
+  "simulator": "icarus",
+  "files": [
+    {"path": "traffic_light.v", "kind": "rtl"},
+    {"path": "tb_traffic_light.v", "kind": "tb"}
+  ],
+  "bugs": [
+    {
+      "id": "ew_skips_yellow",
+      "title": "EW green goes straight to red (yellow skipped)",
+      "description": "The EW_GREEN state jumps directly to ALLRED_EN, so east-west traffic sees green -> red without a yellow warning. Expected failures on every rotation: ew_green_next (exp 0x4 EW_YELLOW, act 0x5 ALLRED_EN) and allred_en_safety with first_violation=4 (illegal EW lamp change green -> red in the first all-red cycle).",
+      "file": "traffic_light.v",
+      "find": "S_EW_GREEN:  if (green_end)  st <= S_EW_YELLOW;",
+      "replace": "S_EW_GREEN:  if (green_end)  st <= S_ALLRED_EN;"
+    },
+    {
+      "id": "ew_green_decode_typo",
+      "title": "Both roads green (copy-paste error in the EW lamp decoder)",
+      "description": "The EW lamp decoder compares against S_NS_GREEN instead of S_EW_GREEN: during every NS green phase both roads show green, and EW never shows green in its own phase. Expected failures: ns_green_safety with first_violation=1 (both roads not red), ns_green_outputs / ew_green_outputs mismatches and ns_yellow_safety / ew_yellow_safety (illegal EW lamp changes green -> red and red -> yellow).",
+      "file": "traffic_light.v",
+      "find": "assign ew_light = (st == S_EW_GREEN)  ? L_GREEN  :",
+      "replace": "assign ew_light = (st == S_NS_GREEN)  ? L_GREEN  :"
+    },
+    {
+      "id": "yellow_one_cycle_short",
+      "title": "Yellow phase one cycle too short",
+      "description": "The yellow phase ends when the phase timer reaches YELLOW_T-2, so yellow lasts YELLOW_T-1 cycles (2 instead of 3). Expected failures: ns_yellow_duration and ew_yellow_duration (exp 0x3, act 0x2) on every rotation.",
+      "file": "traffic_light.v",
+      "find": "wire yellow_end = is_yellow && (timer == Y_LAST);",
+      "replace": "wire yellow_end = is_yellow && (timer == Y_LAST - 1'b1);"
+    }
+  ]
+}

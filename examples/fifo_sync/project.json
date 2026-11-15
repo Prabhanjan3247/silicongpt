@@ -1,0 +1,41 @@
+{
+  "key": "fifo_sync",
+  "name": "Synchronous FIFO (8 x 8-bit)",
+  "description": "Single-clock FIFO with registered read data, full/empty flags and an occupancy counter. Self-checking testbench with an independent queue reference model, overflow/underflow, simultaneous read/write (empty, mid, full), pointer wrap-around, asynchronous reset in mid-traffic and seeded random traffic with functional coverage.",
+  "category": "sequential",
+  "difficulty": "intermediate",
+  "spec": "Design a single-clock synchronous FIFO named fifo_sync with parameters WIDTH=8 (data width) and DEPTH=8 (number of entries, must be a power of two). Ports: input clk; input rst_n (asynchronous, active-low reset); input wr_en; input [WIDTH-1:0] din; input rd_en; output reg [WIDTH-1:0] dout; output full; output empty; output [$clog2(DEPTH):0] count. Everything is synchronous to the rising edge of clk except the reset. While rst_n is low the FIFO is empty: count=0, empty=1, full=0, dout=0 and the read/write pointers are 0; reset takes effect immediately without waiting for a clock edge. A read is performed on a rising edge when rd_en=1 and the FIFO is not empty; reads from an empty FIFO are ignored. dout is registered: on an edge that performs a read it takes the value of the oldest stored entry and that entry is removed; on all other edges dout keeps its previous value. A write is performed on a rising edge when wr_en=1 and either the FIFO is not full, or the FIFO is full and a read is performed in the same cycle (the read frees the slot, count stays at DEPTH). Writes to a full FIFO without a simultaneous read are ignored. When the FIFO is empty and wr_en=1 and rd_en=1 the read is ignored and the write is accepted (dout does not change, count becomes 1). count is the number of stored entries (0..DEPTH): +1 on a write without read, -1 on a read without write, unchanged when both or neither happen. full = (count == DEPTH) and empty = (count == 0), decoded from the registered count. Data must come out in exactly the order it was accepted, across pointer wrap-around. The design must be synthesizable without latches.",
+  "top_module": "fifo_sync",
+  "tb_top": "tb_fifo_sync",
+  "simulator": "icarus",
+  "files": [
+    {"path": "fifo_sync.v", "kind": "rtl"},
+    {"path": "tb_fifo_sync.v", "kind": "tb"}
+  ],
+  "bugs": [
+    {
+      "id": "full_one_entry_early",
+      "title": "full asserted one entry early",
+      "description": "The full flag compares count against DEPTH-1 instead of DEPTH, so the FIFO reports full with 7 of 8 entries stored and silently drops the 8th write. Expected failures: fill_full_empty at the 7th write (full=1 too early), fill_count at the 8th write, then overflow/simul_full mismatches.",
+      "file": "fifo_sync.v",
+      "find": "assign full  = (count == DEPTH_C);",
+      "replace": "assign full  = (count >= DEPTH_C - 1'b1);"
+    },
+    {
+      "id": "rd_ptr_stall_on_simul_rw",
+      "title": "Read pointer does not advance on simultaneous read/write",
+      "description": "The read pointer is only incremented when no write happens in the same cycle. dout is correct for that read, but the entry is not consumed, so the next read returns the same data again and the oldest data is later overwritten. Expected failures: *_dout checks after the first simultaneous read/write (simul_full, simul_mid, wrap, random).",
+      "file": "fifo_sync.v",
+      "find": "rd_ptr <= rd_ptr + 1'b1;",
+      "replace": "rd_ptr <= do_write ? rd_ptr : rd_ptr + 1'b1;"
+    },
+    {
+      "id": "count_inc_on_simul_rw",
+      "title": "count incremented on simultaneous read/write",
+      "description": "The occupancy update gives the write priority: when a read and a write happen in the same cycle count is incremented instead of staying unchanged. count and the full/empty flags drift away from the real occupancy (count can exceed DEPTH, full deasserts while the FIFO holds DEPTH entries and data gets overwritten). Expected failures: simul_full_count and simul_full_full_empty at the first simultaneous read/write, then dout mismatches.",
+      "file": "fifo_sync.v",
+      "find": "if (do_write && !do_read)",
+      "replace": "if (do_write)"
+    }
+  ]
+}

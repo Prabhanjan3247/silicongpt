@@ -1,0 +1,41 @@
+{
+  "key": "uart_tx",
+  "name": "UART transmitter (8N1)",
+  "description": "UART transmitter, 8 data bits LSB first, no parity, 1 stop bit, CLKS_PER_BIT clocks per bit, busy flag and one-cycle done pulse. Self-checking testbench with an independent mid-bit-sampling receiver model plus a cycle-accurate timing model: byte patterns, back-to-back frames, start requests while busy, asynchronous reset in mid-frame, idle line and seeded random traffic with functional coverage.",
+  "category": "sequential",
+  "difficulty": "intermediate",
+  "spec": "Design a UART transmitter named uart_tx with parameter CLKS_PER_BIT (default 16, clock cycles per bit, >= 1). Ports: input clk; input rst_n (asynchronous, active-low reset); input tx_start; input [7:0] tx_data; output reg tx (serial line, idle high); output reg busy; output reg done. Frame format 8N1: one start bit (0), eight data bits least-significant bit first, no parity, one stop bit (1); every bit lasts exactly CLKS_PER_BIT clock cycles. While rst_n is low: tx=1, busy=0, done=0, effective immediately. A frame starts on the rising clock edge S where tx_start=1 and busy=0; tx_data is captured on that edge (later changes of tx_data do not affect the frame). tx is registered: the start bit is driven from edge S, data bit i (i=0..7) from edge S+(1+i)*CLKS_PER_BIT and the stop bit from edge S+9*CLKS_PER_BIT. busy is 1 from edge S until edge S+10*CLKS_PER_BIT; on that edge busy returns to 0, tx stays 1 and done is 1 for exactly one clock cycle. tx_start while busy=1 (including the last busy cycle) is ignored and not queued. The earliest next frame starts on edge S+10*CLKS_PER_BIT+1 when tx_start is high during the done cycle. Holding tx_start high transmits the same byte repeatedly. The design must be synthesizable without latches.",
+  "top_module": "uart_tx",
+  "tb_top": "tb_uart_tx",
+  "simulator": "icarus",
+  "files": [
+    {"path": "uart_tx.v", "kind": "rtl"},
+    {"path": "tb_uart_tx.v", "kind": "tb"}
+  ],
+  "bugs": [
+    {
+      "id": "msb_first",
+      "title": "Data bits sent MSB first",
+      "description": "The shift register shifts left and puts bit 7 on the line first, so every frame is bit-reversed. The receiver model decodes the reversed byte (e.g. 0x01 arrives as 0x80) and the cycle checker sees the wrong level in the first data bit slot that differs. Bit-palindromic bytes (0x00, 0xFF, 0xA5, 0x3C, 0xC3, ...) still pass, which is why the testbench uses many asymmetric patterns. Expected failures: *_rx_data and *_tx_timing.",
+      "file": "uart_tx.v",
+      "find": "tx <= shreg[0]; shreg <= {1'b0, shreg[7:1]};  // next data bit, LSB first",
+      "replace": "tx <= shreg[7]; shreg <= {shreg[6:0], 1'b0};  // next data bit, MSB first"
+    },
+    {
+      "id": "stop_bit_low",
+      "title": "Stop bit driven low",
+      "description": "After the last data bit the transmitter drives 0 instead of 1 for the stop-bit period (framing error at every receiver); the line only returns high when the frame ends. Expected failures: *_stop_bit (exp 0x1, act 0x0) and *_tx_timing at bit_slot=9 for every frame.",
+      "file": "uart_tx.v",
+      "find": "tx    <= 1'b1;         // stop bit",
+      "replace": "tx    <= 1'b0;         // stop bit"
+    },
+    {
+      "id": "bit_period_short",
+      "title": "Bit period one clock too short",
+      "description": "The bit counter terminates at CLKS_PER_BIT-2, so every bit lasts CLKS_PER_BIT-1 clocks (15 instead of 16): the baud rate is 6.7% too fast, the frame is 150 instead of 160 cycles and busy falls / done pulses 10 cycles early. The cycle checker reports the first wrong level at the first bit boundary where the line changes (frame_cycle=15 when data bit 0 differs from the start bit, frame_cycle=135 for 0x00 where only the early stop bit is visible); the mid-bit receiver drifts by one clock per bit and decodes wrong bytes. Expected failures: *_tx_timing, *_busy and *_done for every frame, plus *_rx_data.",
+      "file": "uart_tx.v",
+      "find": "wire bit_end = (clk_cnt == LAST_CLK);",
+      "replace": "wire bit_end = (clk_cnt == LAST_CLK - 1'b1);"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "key": "alu4",
+  "name": "4-bit ALU",
+  "description": "Small combinational 4-bit ALU (ADD, SUB, AND, OR) with carry and zero flags, verified by an exhaustive self-checking testbench (all 1024 input combinations) with functional coverage and two injectable bugs.",
+  "category": "combinational",
+  "difficulty": "beginner",
+  "spec": "Design a purely combinational 4-bit ALU named alu4 (no clock, no reset, no latches). Inputs: a[3:0], b[3:0], op[1:0]. Outputs: y[3:0], carry, zero. op 00 ADD: {carry, y} = a + b (carry is the carry out of the 5-bit sum). op 01 SUB: y = a - b computed as a + ~b + 1; carry is the carry out of that sum, so carry = 1 means no borrow (a >= b as unsigned numbers) and carry = 0 means a borrow occurred. op 10 AND: y = a & b, carry = 0. op 11 OR: y = a | b, carry = 0. zero = 1 exactly when y == 0.",
+  "top_module": "alu4",
+  "tb_top": "tb_alu4",
+  "simulator": "icarus",
+  "files": [
+    {"path": "alu4.v", "kind": "rtl"},
+    {"path": "tb_alu4.v", "kind": "tb"}
+  ],
+  "bugs": [
+    {
+      "id": "sub_operands_swapped",
+      "title": "SUB computes b - a",
+      "description": "The operands of the subtract path are swapped (b + ~a + 1), so SUB returns b - a. Only a == b survives: y is wrong whenever a - b is not 0 or 8 (mod 16), and carry is inverted for every a != b because the no-borrow test effectively becomes b >= a. ADD, AND and OR are unaffected.",
+      "file": "alu4.v",
+      "find": "OP_SUB: {carry, y} = {1'b0, a} + {1'b0, ~b} + 5'd1;",
+      "replace": "OP_SUB: {carry, y} = {1'b0, b} + {1'b0, ~a} + 5'd1;"
+    },
+    {
+      "id": "zero_ignores_msb",
+      "title": "Zero flag ignores y[3]",
+      "description": "The zero detector only compares y[2:0] (a width slip left over from a 3-bit version of the ALU), so a result of 4'b1000 is flagged as zero. Every other result is correct, so only the vectors whose result is exactly 0x8 fail - the kind of bug that slips through a handful of directed tests but not an exhaustive sweep.",
+      "file": "alu4.v",
+      "find": "assign zero = (y == 4'h0);",
+      "replace": "assign zero = (y[2:0] == 3'h0);"
+    }
+  ]
+}

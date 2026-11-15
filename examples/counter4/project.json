@@ -1,0 +1,41 @@
+{
+  "key": "counter4",
+  "name": "4-bit Counter",
+  "description": "4-bit up counter with asynchronous active-low reset, synchronous load (priority over enable), count enable and a terminal-count output. Self-checking testbench with a cycle-accurate reference model, checks before and after every rising edge, mid-cycle asynchronous reset checks, random stimulus, functional coverage and three injectable bugs.",
+  "category": "sequential",
+  "difficulty": "beginner",
+  "spec": "Design a 4-bit up counter named counter4. Inputs: clk, rst_n (asynchronous, active-low reset), en (count enable), load (synchronous load), d[3:0]. Outputs: q[3:0], tc. rst_n = 0 clears q to 0 immediately, without waiting for a clock edge, and overrides load and en. On every rising edge of clk with rst_n = 1: if load = 1 then q <= d (load has priority over en and also loads when en = 0); else if en = 1 then q <= q + 1, wrapping from 15 to 0; otherwise q holds its value. tc (terminal count) is combinational: tc = en && (q == 15).",
+  "top_module": "counter4",
+  "tb_top": "tb_counter4",
+  "simulator": "icarus",
+  "files": [
+    {"path": "counter4.v", "kind": "rtl"},
+    {"path": "tb_counter4.v", "kind": "tb"}
+  ],
+  "bugs": [
+    {
+      "id": "sync_reset",
+      "title": "Reset made synchronous",
+      "description": "negedge rst_n is missing from the sensitivity list, so the reset is only seen at the next rising clock edge. Start-up reset still looks fine because the clock keeps running while rst_n is low, but when rst_n is asserted between clock edges q keeps its old value until clk rises. Only the mid-cycle reset checks (check=mid_cycle, q exp=0x0) fail; every check before and after the rising edges still passes.",
+      "file": "counter4.v",
+      "find": "always @(posedge clk or negedge rst_n) begin",
+      "replace": "always @(posedge clk) begin"
+    },
+    {
+      "id": "load_gated_by_enable",
+      "title": "Load only works while en is high",
+      "description": "The load branch was written as load && en, a common misreading of the spec: load is synchronous and has priority over en, so it must load d even when en = 0. With en low the load request is ignored and q simply holds, so every load issued with en = 0 fails after the rising edge: load_without_en, the second load_back_to_back, wrap_load, tc_load_max_en_low and the random cycles that load with en low. Loads with en = 1 still pass.",
+      "file": "counter4.v",
+      "find": "else if (load)",
+      "replace": "else if (load && en)"
+    },
+    {
+      "id": "tc_ignores_enable",
+      "title": "tc not qualified by en",
+      "description": "tc is decoded from q alone (q == 4'hF) and the en term was dropped. tc is then high whenever the counter sits at 15, even while counting is disabled, which would make the next stage of a cascaded counter advance when it should not. Every check with q = 15 and en = 0 fails on the tc field: tc_load_max_en_low, tc_blocked_by_en, tc_follows_en and the random cycles with q = 15 and en = 0, both before and after the rising edge.",
+      "file": "counter4.v",
+      "find": "assign tc = en && (q == 4'hF);",
+      "replace": "assign tc = (q == 4'hF);"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "key": "riscv_sc",
+  "name": "Single-cycle RV32I CPU",
+  "description": "Single-cycle RV32I processor core (all 37 base user-level integer instructions plus ECALL as halt) split into ALU, register file, immediate generator, decoder, branch unit, instruction ROM and byte-enabled data RAM. The testbench runs a 141-instruction self-checking program and compares every register and every written memory word with an independent instruction-set simulator, with per-class instruction coverage and four injectable bugs.",
+  "category": "processor",
+  "difficulty": "advanced",
+  "spec": "Design a single-cycle RV32I CPU named riscv_sc. Ports: clk, rst_n (asynchronous, active-low reset), outputs pc[31:0] (byte address of the current instruction), instr[31:0] (current instruction) and halted. Every instruction completes in one clock cycle. Use one module per file: riscv_sc (datapath and wiring), rv_alu (ADD SUB SLL SLT SLTU XOR SRL SRA OR AND and pass-B), rv_regfile (32 x 32-bit registers, x0 hard-wired to zero, two asynchronous read ports, one synchronous write port, cleared by reset), rv_imm_gen (I/S/B/U/J immediates, sign-extended), rv_decoder (control signals and instruction class flags), rv_branch (BEQ BNE BLT BGE signed, BLTU BGEU unsigned), rv_imem (256-word instruction ROM, asynchronous read, initialised with $readmemh(\"program.hex\", mem), addressed by pc[9:2]) and rv_dmem (64-word data RAM, synchronous write with 4 byte enables, asynchronous word read, addressed by address[7:2]). Implement LUI AUIPC JAL JALR BEQ BNE BLT BGE BLTU BGEU LB LH LW LBU LHU SB SH SW ADDI SLTI SLTIU XORI ORI ANDI SLLI SRLI SRAI ADD SUB SLL SLT SLTU XOR SRL SRA OR AND with standard RV32I semantics: JAL/JALR write pc + 4 to rd, JALR clears bit 0 of the target, loads sign- or zero-extend the selected byte/halfword, SB/SH write only the addressed bytes. Writes to x0 are ignored. rst_n = 0 sets pc = 0, halted = 0 and clears all registers. ECALL (32'h00000073) sets halted at the end of its cycle; afterwards pc stays at the ECALL and no register or memory is written until reset. Unsupported opcodes act as NOPs. Misaligned accesses are not supported.",
+  "top_module": "riscv_sc",
+  "tb_top": "tb_riscv_sc",
+  "simulator": "icarus",
+  "files": [
+    {"path": "riscv_sc.v", "kind": "rtl"},
+    {"path": "rv_alu.v", "kind": "rtl"},
+    {"path": "rv_regfile.v", "kind": "rtl"},
+    {"path": "rv_imm_gen.v", "kind": "rtl"},
+    {"path": "rv_decoder.v", "kind": "rtl"},
+    {"path": "rv_branch.v", "kind": "rtl"},
+    {"path": "rv_imem.v", "kind": "rtl"},
+    {"path": "rv_dmem.v", "kind": "rtl"},
+    {"path": "program.hex", "kind": "data"},
+    {"path": "tb_riscv_sc.v", "kind": "tb"}
+  ],
+  "bugs": [
+    {
+      "id": "sub_decoded_as_add",
+      "title": "SUB decoded as ADD (funct7 bit ignored)",
+      "description": "The decoder selects the ALU operation for funct3 = 000 from funct3 alone and ignores funct7 bit 30 (instr[30]), so every SUB executes as ADD. ADDI is unaffected. The SUB results the program dumps to data memory (mem_w10 = 3 - (-5), mem_w11 = -5 - 0x12345678) come out as sums, so those memory checks fail.",
+      "file": "rv_decoder.v",
+      "find": "3'b000: alu_op = (is_rtype && instr[30]) ? ALU_SUB : ALU_ADD;",
+      "replace": "3'b000: alu_op = ALU_ADD;"
+    },
+    {
+      "id": "sra_as_srl",
+      "title": "Arithmetic right shift does not sign-extend",
+      "description": "The ALU implements SRA with the logical shift operator, so SRA and SRAI fill the vacated bits with zeros instead of copies of the sign bit. Shifting the negative operands in the program gives 0x7FFFFFFD instead of 0xFFFFFFFD (SRAI, mem_w8) and 0x18000000 instead of 0xF8000000 (SRA, mem_w17).",
+      "file": "rv_alu.v",
+      "find": "ALU_SRA:   y = $signed(a) >>> shamt;",
+      "replace": "ALU_SRA:   y = a >> shamt;"
+    },
+    {
+      "id": "blt_unsigned_compare",
+      "title": "BLT compares unsigned",
+      "description": "The branch unit evaluates BLT with an unsigned comparison, so BLT behaves like BLTU. The loop (positive operands) still works, but BLT -5, 3 is no longer taken and BLT 3, -5 is taken. The branch mark registers x15 (marks of branches that must be taken, expected 0) and x16 (marks of branches that must not be taken) and the copy in mem_w42 fail, and the BLT_taken / BLT_not_taken coverage counts change.",
+      "file": "rv_branch.v",
+      "find": "3'b100:  take = ($signed(a) < $signed(b));",
+      "replace": "3'b100:  take = (a < b);"
+    },
+    {
+      "id": "x0_writable",
+      "title": "x0 is writable",
+      "description": "The register-file write enable no longer excludes address 0, so instructions with rd = x0 (ADDI x0, LW x0, JAL x0) overwrite x0 and later reads of x0 return the stale value. The per-cycle x0_always_zero check fails, and every result computed from x0 afterwards is wrong: register checks such as reg_x14 = x0 + x0 (0x2468ACF0 instead of 0), the x15/x16 branch marks and the loop registers, and most memory words, because the result dump uses x0 as its base address and lands at the wrong addresses.",
+      "file": "rv_regfile.v",
+      "find": "end else if (we && (wa == IDX) && (wa != 5'd0)) begin",
+      "replace": "end else if (we && (wa == IDX)) begin"
+    }
+  ]
+}
