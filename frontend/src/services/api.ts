@@ -252,7 +252,12 @@ async function errorFromResponse(res: Response, method: string, path: string): P
     detail = formatErrorDetail((body as { detail: unknown }).detail);
   } else if (isHtml) {
     // A proxy / web server error page, not an API response: do not dump its markup.
-    detail = `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''}: the server returned an HTML page instead of an API response (${method} ${API_BASE}${path}).`;
+    const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
+    if (isGitHubPages) {
+      detail = `You are viewing SiliconGPT on GitHub Pages (static preview). GitHub Pages cannot run the Python/EDA compiler backend. To run simulations, open the app locally at http://localhost:5173 with your backend running.`;
+    } else {
+      detail = `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''}: the server returned an HTML page instead of an API response (${method} ${API_BASE}${path}).`;
+    }
   } else if (typeof body === 'string') {
     detail = body.trim().slice(0, 800);
   }
