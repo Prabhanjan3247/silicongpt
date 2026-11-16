@@ -10,12 +10,19 @@
 FROM ubuntu:24.04 AS toolchain
 ARG OSS_CAD_SUITE_DATE=2026-11-15
 ARG OSS_CAD_SUITE_TAG=20261115
+ARG TARGETARCH
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl g++ make perl python3 \
  && rm -rf /var/lib/apt/lists/*
-RUN curl -fsSL -o /tmp/oss.tgz \
-      "https://github.com/YosysHQ/oss-cad-suite-build/releases/download/${OSS_CAD_SUITE_DATE}/oss-cad-suite-linux-x64-${OSS_CAD_SUITE_TAG}.tgz" \
+RUN set -e; \
+    if [ "$TARGETARCH" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then \
+      ARCH="arm64"; \
+    else \
+      ARCH="x64"; \
+    fi; \
+    curl -fsSL -o /tmp/oss.tgz \
+      "https://github.com/YosysHQ/oss-cad-suite-build/releases/download/${OSS_CAD_SUITE_DATE}/oss-cad-suite-linux-${ARCH}-${OSS_CAD_SUITE_TAG}.tgz" \
  && tar -xzf /tmp/oss.tgz -C /opt \
  && rm /tmp/oss.tgz
 ENV PATH=/opt/oss-cad-suite/bin:$PATH
