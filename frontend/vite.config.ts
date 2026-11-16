@@ -31,6 +31,7 @@ export default defineConfig(({ mode }) => {
   server: {
     port: 5173,
     strictPort: true,
+    allowedHosts: true,
     proxy: apiProxy,
   },
   preview: {
