@@ -1,6 +1,8 @@
 """Health and system status (toolchain, sandbox, AI configuration - never the credentials)."""
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter
 
 from ..core.config import get_settings
@@ -23,7 +25,11 @@ def system_status() -> dict:
         "toolchain": get_toolchain().as_dict(),
         "sandbox": get_executor().describe(),
         # Only whether credentials exist - the key itself is never returned or logged.
-        "ai": {"configured": bool(s.ai_configured), "model": s.sgpt_model, "fallbacks": bool(s.sgpt_ai_fallbacks)},
+        "ai": {
+            "configured": bool(s.ai_configured),
+            "model": s.sgpt_gemini_model if (s.gemini_api_key or "GEMINI_API_KEY" in os.environ) else s.sgpt_model,
+            "fallbacks": bool(s.sgpt_ai_fallbacks)
+        },
         "version": APP_VERSION,
         "limits": {
             "sim_timeout_s": s.sgpt_sim_timeout_s,

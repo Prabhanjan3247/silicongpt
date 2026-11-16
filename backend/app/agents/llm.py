@@ -220,6 +220,81 @@ def _probe(value: Any, node: Any, defs: dict) -> list[str]:
 _KEY_PATTERN = re.compile(r"sk-ant-[A-Za-z0-9_\-]+")
 
 
+def _clean_for_gemini(node: Any) -> Any:
+    if not isinstance(node, dict):
+        return node
+    out: dict = {}
+    for k, v in node.items():
+        if k in ("additionalProperties", "$schema", "definitions", "$defs"):
+            continue
+        if isinstance(v, dict):
+            out[k] = _clean_for_gemini(v)
+        elif isinstance(v, list):
+            out[k] = [_clean_for_gemini(item) if isinstance(item, dict) else item for item in v]
+        else:
+            out[k] = v
+    return out
+
+
+def _call_gemini(api_key: str, model: str, system: str, user: str, schema: dict, timeout_s: float) -> LLMResult:
+    import urllib.request
+    started = time.monotonic()
+    clean_schema = _clean_for_gemini(schema)
+    payload = {
+        "contents": [{"parts": [{"text": user}]}],
+        "systemInstruction": {"parts": [{"text": system}]},
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": clean_schema,
+        }
+    }
+    models_to_try = [model, "gemini-3.5-flash-lite", "gemini-flash-latest", "gemini-3.8-flash"]
+    models_to_try = list(dict.fromkeys(models_to_try))
+    last_error = None
+
+    for attempt in range(2):
+        for m in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=timeout_s) as res:
+                    body = json.loads(res.read().decode("utf-8"))
+                    candidate = body["candidates"][0]
+                    text = candidate["content"]["parts"][0]["text"]
+                    data = json.loads(text)
+                    duration_ms = int((time.monotonic() - started) * 1000)
+                    usage = body.get("usageMetadata", {})
+                    input_tokens = usage.get("promptTokenCount", 0)
+                    output_tokens = usage.get("candidatesTokenCount", 0)
+                    stop_reason = str(candidate.get("finishReason", "STOP")).lower()
+                    log.info("Gemini call model=%s stop=%s in=%d out=%d ms=%d", m, stop_reason, input_tokens, output_tokens, duration_ms)
+                    return LLMResult(
+                        data=data,
+                        model=m,
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        duration_ms=duration_ms,
+                        stop_reason=stop_reason
+                    )
+            except Exception as exc:
+                last_error = exc
+                err_body = ""
+                if hasattr(exc, "read"):
+                    try:
+                        err_body = exc.read().decode("utf-8")
+                    except Exception:
+                        pass
+                log.warning("Gemini call on %s (attempt %d) failed: %s %s", m, attempt + 1, exc, err_body)
+                time.sleep(0.5)
+                continue
+
+    raise AIResponseError(f"Gemini API call failed: {last_error}")
+
+
 def _build_client(settings: Any) -> Any:
     timeout = float(settings.sgpt_ai_timeout_s)
     if settings.anthropic_api_key:
@@ -346,6 +421,18 @@ class LLMClient:
         settings = self.settings
         if not settings.ai_configured:
             raise AIUnavailableError(MISSING_CREDENTIALS_MESSAGE)
+
+        gemini_key = settings.gemini_api_key or os.environ.get("GEMINI_API_KEY")
+        if gemini_key:
+            return _call_gemini(
+                api_key=gemini_key,
+                model=settings.sgpt_gemini_model,
+                system=system,
+                user=user,
+                schema=schema,
+                timeout_s=float(settings.sgpt_ai_timeout_s),
+            )
+
         request = {
             "model": settings.sgpt_model,
             "max_tokens": max_tokens,

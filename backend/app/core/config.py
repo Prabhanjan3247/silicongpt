@@ -23,6 +23,8 @@ class Settings(BaseSettings):
 
     # --- AI -----------------------------------------------------------------
     anthropic_api_key: str | None = None
+    gemini_api_key: str | None = None
+    sgpt_gemini_model: str = "gemini-3.5-flash-lite"
     sgpt_model: str = "claude-opus-5-5"
     sgpt_ai_fallbacks: bool = True  # server-side refusal fallbacks (beta)
     sgpt_ai_timeout_s: float = 600.0
@@ -63,7 +65,8 @@ class Settings(BaseSettings):
 
     @property
     def ai_configured(self) -> bool:
-        return bool(self.anthropic_api_key or os.environ.get("ANTHROPIC_API_KEY")
+        return bool(self.gemini_api_key or os.environ.get("GEMINI_API_KEY")
+                    or self.anthropic_api_key or os.environ.get("ANTHROPIC_API_KEY")
                     or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
 
 

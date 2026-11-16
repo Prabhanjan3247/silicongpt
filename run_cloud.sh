@@ -24,6 +24,11 @@ if [ ! -d "backend/.venv" ]; then
     backend/.venv/bin/pip install --quiet -r backend/requirements.txt
 fi
 
+# Setup backend .env if GEMINI_API_KEY is present
+if [ -n "$GEMINI_API_KEY" ] && [ ! -f "backend/.env" ]; then
+    echo "GEMINI_API_KEY=$GEMINI_API_KEY" > backend/.env
+fi
+
 # 4. Setup frontend
 if [ ! -d "frontend/node_modules" ]; then
     echo "[4/4] Installing frontend dependencies..."
