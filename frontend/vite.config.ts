@@ -16,6 +16,7 @@ const PROXY_TIMEOUT_MS = 30 * 60 * 1000;
 export default defineConfig(({ mode }) => {
   const fileEnv = loadEnv(mode, process.cwd(), 'SGPT_');
   const BACKEND_URL = process.env.SGPT_BACKEND_URL ?? fileEnv.SGPT_BACKEND_URL ?? 'http://127.0.0.1:8000';
+  const base = process.env.VITE_BASE ?? (process.env.GITHUB_PAGES === 'true' ? '/silicongpt/' : '/');
   const apiProxy: Record<string, ProxyOptions> = {
     '/api': {
       target: BACKEND_URL,
@@ -25,6 +26,7 @@ export default defineConfig(({ mode }) => {
     },
   };
   return {
+  base,
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,

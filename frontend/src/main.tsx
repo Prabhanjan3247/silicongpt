@@ -18,7 +18,7 @@ if (!container) throw new Error('SiliconGPT: #root element missing from index.ht
 
 createRoot(container).render(
   <StrictMode>
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BrowserRouter basename={import.meta.env.BASE_URL} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ToastProvider>
         <ProjectProvider>
           <App />
