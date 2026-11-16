@@ -24,9 +24,20 @@ if [ ! -d "backend/.venv" ]; then
     backend/.venv/bin/pip install --quiet -r backend/requirements.txt
 fi
 
-# Setup backend .env if GEMINI_API_KEY is present
-if [ -n "$GEMINI_API_KEY" ] && [ ! -f "backend/.env" ]; then
-    echo "GEMINI_API_KEY=$GEMINI_API_KEY" > backend/.env
+# Detect Python binary (Linux bin/ vs Windows Scripts/)
+if [ -f "backend/.venv/bin/python" ]; then
+    PYTHON_BIN="backend/.venv/bin/python"
+elif [ -f "backend/.venv/Scripts/python.exe" ]; then
+    PYTHON_BIN="backend/.venv/Scripts/python.exe"
+else
+    PYTHON_BIN="python"
+fi
+
+# Setup backend .env with Gemini key if not present
+if [ ! -f "backend/.env" ]; then
+    KEY="${GEMINI_API_KEY:-AQ.Ab8RN6Ke0vV8sX4Z59nDVmvLrWE2JYjQFQn9rMN3l3ksypMs8Q}"
+    echo "GEMINI_API_KEY=$KEY" > backend/.env
+    echo "SGPT_GEMINI_MODEL=gemini-3.5-flash-lite" >> backend/.env
 fi
 
 # 4. Setup frontend
@@ -40,7 +51,7 @@ echo "SGPT_BACKEND_URL=http://127.0.0.1:8000" > frontend/.env.local
 
 echo ""
 echo "Starting backend server on port 8000..."
-backend/.venv/bin/python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 &
+$PYTHON_BIN -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 &
 BACKEND_PID=$!
 
 echo "Starting frontend dev server on port 5173..."
