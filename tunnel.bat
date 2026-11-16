@@ -1,12 +1,11 @@
 @echo off
 title SiliconGPT Public Web Tunnel
 echo ===================================================
-echo       SiliconGPT Instant Public Tunnel
+echo       SiliconGPT Clean Public Tunnel (Zero Splash Screen)
 echo ===================================================
 echo.
-echo Make sure SiliconGPT is running (via run.bat).
-echo Starting public tunnel on port 5173...
+echo Connecting to Cloudflare edge network...
+echo No passwords, no splash screens, direct access!
 echo.
-echo (If prompted on the webpage for a password, enter your IP from: https://loca.lt/mytunnelpassword)
-echo.
-npx -y localtunnel --port 5173
+cloudflared.exe tunnel --no-prechecks --protocol http2 --edge-ip-version 4 --url http://localhost:5173
+

@@ -21,3 +21,6 @@ frontend/.env.local
 # Local toolchain and scratch work (not versioned)
 eda-toolchain/
 scratch/
+
+cloudflared.exe
+
